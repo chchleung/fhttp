@@ -842,11 +842,11 @@ func (t *Transport) newClientConn(c net.Conn, singleUse bool) (*ClientConn, erro
 	// put customs settings in it
 	if t.Settings != nil {
 		for _, setting := range t.Settings {
-			settingCustomAlreadySet[setting.ID] = true
 			if setting.ID == SettingHeaderTableSize || setting.ID == SettingInitialWindowSize {
 				continue // ignore
 			}
 			initialSettings = append(initialSettings, setting)
+			settingCustomAlreadySet[setting.ID] = true
 		}
 	}
 
