@@ -40,7 +40,7 @@ import (
 	//"golang.org/x/net/http2"
 	//"golang.org/x/net/http2/hpack"
 	"golang.org/x/term"
-	
+
 	"github.com/chchleung/fhttp/http"
 	"github.com/chchleung/fhttp/http2"
 	"github.com/chchleung/fhttp/http2/hpack"
