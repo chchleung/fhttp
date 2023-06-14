@@ -63,6 +63,14 @@ const (
 	defaultMaxConcurrentStreams = 1000
 )
 
+// HTTP2Settings custom http2 settings
+type HTTP2Settings struct {
+	Settings       []Setting
+	ConnectionFlow int
+	HeaderPriority *PriorityParam
+	PriorityFrames []PriorityFrame
+}
+
 // Transport is an HTTP/2 Transport.
 //
 // A Transport internally caches connections to servers. It is safe
@@ -181,6 +189,14 @@ type Transport struct {
 
 	connPoolOnce  sync.Once
 	connPoolOrDef ClientConnPool // non-nil version of ConnPool
+
+	// custom http2 settings
+	HTTP2Settings *HTTP2Settings
+
+	// Settings should not include InitialWindowSize or HeaderTableSize, set that in Transport
+	Settings          []Setting
+	InitialWindowSize uint32 // if nil, will use global initialWindowSize
+	HeaderTableSize   uint32 // if nil, will use global initialHeaderTableSize
 }
 
 func (t *Transport) maxHeaderListSize() uint32 {
@@ -795,19 +811,79 @@ func (t *Transport) newClientConn(c net.Conn, singleUse bool) (*ClientConn, erro
 		cc.tlsState = &state
 	}
 
-	initialSettings := []Setting{
-		{ID: SettingEnablePush, Val: 0},
-		{ID: SettingInitialWindowSize, Val: transportDefaultStreamFlow},
+	//initialSettings := []Setting{
+	//	{ID: SettingEnablePush, Val: 0},
+	//	{ID: SettingInitialWindowSize, Val: transportDefaultStreamFlow},
+	//}
+	//if max := t.maxFrameReadSize(); max != 0 {
+	//	initialSettings = append(initialSettings, Setting{ID: SettingMaxFrameSize, Val: max})
+	//}
+	//if max := t.maxHeaderListSize(); max != 0 {
+	//	initialSettings = append(initialSettings, Setting{ID: SettingMaxHeaderListSize, Val: max})
+	//}
+	//if maxHeaderTableSize != initialHeaderTableSize {
+	//	initialSettings = append(initialSettings, Setting{ID: SettingHeaderTableSize, Val: maxHeaderTableSize})
+	//}
+
+	// modify the initialSetting by customs
+	// ====== modify start ======
+
+	var settingCustomAlreadySet = map[SettingID]bool{
+		SettingHeaderTableSize:      false,
+		SettingEnablePush:           false,
+		SettingMaxConcurrentStreams: false,
+		SettingInitialWindowSize:    false,
+		SettingMaxFrameSize:         false,
+		SettingMaxHeaderListSize:    false,
 	}
-	if max := t.maxFrameReadSize(); max != 0 {
-		initialSettings = append(initialSettings, Setting{ID: SettingMaxFrameSize, Val: max})
+
+	var initialSettings []Setting
+
+	// put customs settings in it
+	if t.Settings != nil {
+		for _, setting := range t.Settings {
+			settingCustomAlreadySet[setting.ID] = true
+			if setting.ID == SettingHeaderTableSize || setting.ID == SettingInitialWindowSize {
+				continue // ignore
+			}
+			initialSettings = append(initialSettings, setting)
+		}
 	}
-	if max := t.maxHeaderListSize(); max != 0 {
-		initialSettings = append(initialSettings, Setting{ID: SettingMaxHeaderListSize, Val: max})
+
+	// put customs args on transport in it
+	if t.InitialWindowSize != 0 {
+		initialSettings = append(initialSettings, Setting{ID: SettingInitialWindowSize, Val: t.InitialWindowSize})
+		settingCustomAlreadySet[SettingInitialWindowSize] = true
 	}
-	if maxHeaderTableSize != initialHeaderTableSize {
-		initialSettings = append(initialSettings, Setting{ID: SettingHeaderTableSize, Val: maxHeaderTableSize})
+	if t.HeaderTableSize != 0 {
+		initialSettings = append(initialSettings, Setting{ID: SettingHeaderTableSize, Val: t.HeaderTableSize})
+		settingCustomAlreadySet[SettingHeaderTableSize] = true
 	}
+
+	// put default if not set by customs
+	if !settingCustomAlreadySet[SettingEnablePush] {
+		initialSettings = append(initialSettings, Setting{ID: SettingEnablePush, Val: 0})
+	}
+	if !settingCustomAlreadySet[SettingInitialWindowSize] {
+		initialSettings = append(initialSettings, Setting{ID: SettingInitialWindowSize, Val: transportDefaultStreamFlow})
+	}
+	if !settingCustomAlreadySet[SettingMaxFrameSize] {
+		if max := t.maxFrameReadSize(); max != 0 {
+			initialSettings = append(initialSettings, Setting{ID: SettingMaxFrameSize, Val: max})
+		}
+	}
+	if !settingCustomAlreadySet[SettingMaxHeaderListSize] {
+		if maxHeaderTableSize != initialHeaderTableSize {
+			initialSettings = append(initialSettings, Setting{ID: SettingHeaderTableSize, Val: maxHeaderTableSize})
+		}
+	}
+	if !settingCustomAlreadySet[SettingHeaderTableSize] {
+		if maxHeaderTableSize != initialHeaderTableSize {
+			initialSettings = append(initialSettings, Setting{ID: SettingHeaderTableSize, Val: maxHeaderTableSize})
+		}
+	}
+
+	// ====== modify end ======
 
 	cc.bw.Write(clientPreface)
 	cc.fr.WriteSettings(initialSettings...)
