@@ -98,7 +98,7 @@ func (s *Setting) Value() string {
 func setUpdate(update func(string, string))
 
 func init() {
-	setUpdate(update)
+	//setUpdate(update)
 }
 
 var updateMu sync.Mutex
