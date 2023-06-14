@@ -14,8 +14,8 @@ import (
 	"mime"
 	"mime/multipart"
 	"net"
-	. "net/http"
-	"net/http/httptest"
+	//. "net/http"
+	//"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
@@ -28,6 +28,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+	. "github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptest"
 )
 
 const (

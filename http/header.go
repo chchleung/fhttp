@@ -6,8 +6,8 @@ package http
 
 import (
 	"io"
-	"net/http/httptrace"
-	"net/http/internal/ascii"
+	//"net/http/httptrace"
+	//"net/http/internal/ascii"
 	"net/textproto"
 	"sort"
 	"strings"
@@ -15,6 +15,9 @@ import (
 	"time"
 
 	"golang.org/x/net/http/httpguts"
+	
+	"github.com/chchleung/fhttp/http/httptrace"
+	"github.com/chchleung/fhttp/http/internal/ascii"
 )
 
 // A Header represents the key-value pairs in an HTTP header.

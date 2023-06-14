@@ -8,7 +8,7 @@ package http
 
 import (
 	"bytes"
-	"internal/testenv"
+	//"internal/testenv"
 	"io/fs"
 	"net/url"
 	"os"
@@ -17,6 +17,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/chchleung/fhttp/http/internal/testenv"
 )
 
 func TestForeachHeaderElement(t *testing.T) {

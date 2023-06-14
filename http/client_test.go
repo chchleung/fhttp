@@ -13,13 +13,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"internal/testenv"
+	//"internal/testenv"
 	"io"
 	"log"
 	"net"
-	. "net/http"
-	"net/http/cookiejar"
-	"net/http/httptest"
+	//. "net/http"
+	//"net/http/cookiejar"
+	//"net/http/httptest"
 	"net/url"
 	"reflect"
 	"runtime"
@@ -29,6 +29,11 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	. "github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/cookiejar"
+	"github.com/chchleung/fhttp/http/httptest"
+	"github.com/chchleung/fhttp/http/internal/testenv"
 )
 
 var robotsTxtHandler = HandlerFunc(func(w ResponseWriter, r *Request) {

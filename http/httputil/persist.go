@@ -9,9 +9,11 @@ import (
 	"errors"
 	"io"
 	"net"
-	"net/http"
+	//"net/http"
 	"net/textproto"
 	"sync"
+
+	http "github.com/chchleung/fhttp/http"
 )
 
 var (

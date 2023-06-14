@@ -13,7 +13,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"internal/godebug"
+	//"internal/godebug"
 	"io"
 	"log"
 	"math/rand"
@@ -31,6 +31,8 @@ import (
 	"time"
 
 	"golang.org/x/net/http/httpguts"
+
+	"github.com/chchleung/fhttp/http/internal/godebug"
 )
 
 // Errors used by the HTTP server.

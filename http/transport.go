@@ -17,12 +17,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"internal/godebug"
+	//"internal/godebug"
 	"io"
 	"log"
 	"net"
-	"net/http/httptrace"
-	"net/http/internal/ascii"
+	//"net/http/httptrace"
+	//"net/http/internal/ascii"
 	"net/textproto"
 	"net/url"
 	"reflect"
@@ -33,6 +33,10 @@ import (
 
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http/httpproxy"
+
+	"github.com/chchleung/fhttp/http/httptrace"
+	"github.com/chchleung/fhttp/http/internal/ascii"
+	"github.com/chchleung/fhttp/http/internal/godebug"
 )
 
 // DefaultTransport is the default implementation of Transport and is

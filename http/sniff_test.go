@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"io"
 	"log"
-	. "net/http"
+	//. "net/http"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+
+	. "github.com/chchleung/fhttp/http"
 )
 
 var sniffTests = []struct {

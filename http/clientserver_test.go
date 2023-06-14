@@ -18,10 +18,10 @@ import (
 	"io"
 	"log"
 	"net"
-	. "net/http"
-	"net/http/httptest"
-	"net/http/httptrace"
-	"net/http/httputil"
+	//. "net/http"
+	//"net/http/httptest"
+	//"net/http/httptrace"
+	//"net/http/httputil"
 	"net/textproto"
 	"net/url"
 	"os"
@@ -33,6 +33,12 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	
+	. "github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptest"
+	"github.com/chchleung/fhttp/http/httptrace"
+	"github.com/chchleung/fhttp/http/httputil"
+	
 )
 
 type testMode string

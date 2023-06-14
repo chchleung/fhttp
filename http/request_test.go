@@ -14,13 +14,15 @@ import (
 	"io"
 	"math"
 	"mime/multipart"
-	. "net/http"
+	//. "net/http"
 	"net/url"
 	"os"
 	"reflect"
 	"regexp"
 	"strings"
 	"testing"
+
+	. "github.com/chchleung/fhttp/http"
 )
 
 func TestQuery(t *testing.T) {

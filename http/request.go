@@ -18,8 +18,8 @@ import (
 	"mime"
 	"mime/multipart"
 	"net"
-	"net/http/httptrace"
-	"net/http/internal/ascii"
+	//"net/http/httptrace"
+	//"net/http/internal/ascii"
 	"net/textproto"
 	"net/url"
 	urlpkg "net/url"
@@ -28,6 +28,9 @@ import (
 	"sync"
 
 	"golang.org/x/net/idna"
+
+	"github.com/chchleung/fhttp/http/httptrace"
+	"github.com/chchleung/fhttp/http/internal/ascii"
 )
 
 const (

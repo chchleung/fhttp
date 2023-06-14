@@ -7,11 +7,13 @@ package httptest
 import (
 	"crypto/tls"
 	"io"
-	"net/http"
+	//"net/http"
 	"net/url"
 	"reflect"
 	"strings"
 	"testing"
+
+	http "github.com/chchleung/fhttp/http"
 )
 
 func TestNewRequest(t *testing.T) {

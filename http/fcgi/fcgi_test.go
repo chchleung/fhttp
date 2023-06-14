@@ -8,10 +8,12 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"net/http"
+	//"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	http "github.com/chchleung/fhttp/http"
 )
 
 var sizeTests = []struct {

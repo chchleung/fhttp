@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	. "net/http"
+	//. "net/http"
 	"os"
 	"sync"
 	"testing"
 	"time"
+	
+	. "github.com/chchleung/fhttp/http"
 )
 
 func TestResponseControllerFlush(t *testing.T) { run(t, testResponseControllerFlush) }

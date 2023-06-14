@@ -12,9 +12,11 @@ import (
 	"errors"
 	"io"
 	"net"
-	"net/http/internal/testcert"
+	//"net/http/internal/testcert"
 	"strings"
 	"testing"
+
+	"github.com/chchleung/fhttp/http/internal/testcert"
 )
 
 // Issue 15446: incorrect wrapping of errors when server closes an idle connection.

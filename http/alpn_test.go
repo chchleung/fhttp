@@ -11,10 +11,13 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	. "net/http"
-	"net/http/httptest"
+	//. "net/http"
+	//"net/http/httptest"
 	"strings"
 	"testing"
+
+	. "github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptest"
 )
 
 func TestNextProtoUpgrade(t *testing.T) {

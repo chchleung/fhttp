@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http/internal/ascii"
+	//"net/http/internal/ascii"
 	"net/url"
 	"reflect"
 	"sort"
@@ -25,6 +25,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/chchleung/fhttp/http/internal/ascii"
 )
 
 // A Client is an HTTP client. Its zero value (DefaultClient) is a

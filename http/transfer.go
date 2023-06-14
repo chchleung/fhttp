@@ -10,9 +10,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http/httptrace"
-	"net/http/internal"
-	"net/http/internal/ascii"
+	//"net/http/httptrace"
+	//"net/http/internal"
+	//"net/http/internal/ascii"
 	"net/textproto"
 	"reflect"
 	"sort"
@@ -22,6 +22,10 @@ import (
 	"time"
 
 	"golang.org/x/net/http/httpguts"
+
+	"github.com/chchleung/fhttp/http/httptrace"
+	"github.com/chchleung/fhttp/http/internal"
+	"github.com/chchleung/fhttp/http/internal/ascii"
 )
 
 // ErrLineTooLong is returned when reading request or response bodies

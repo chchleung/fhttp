@@ -67,10 +67,10 @@ import (
 	"context"
 	"fmt"
 	"html"
-	"internal/profile"
+	//"internal/profile"
 	"io"
 	"log"
-	"net/http"
+	//"net/http"
 	"net/url"
 	"os"
 	"runtime"
@@ -80,6 +80,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	http "github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/internal/profile"
 )
 
 func init() {

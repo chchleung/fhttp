@@ -21,16 +21,16 @@ import (
 	"errors"
 	"fmt"
 	"go/token"
-	"internal/nettrace"
+	//"internal/nettrace"
 	"io"
 	"log"
 	mrand "math/rand"
 	"net"
-	. "net/http"
-	"net/http/httptest"
-	"net/http/httptrace"
-	"net/http/httputil"
-	"net/http/internal/testcert"
+	//. "net/http"
+	//"net/http/httptest"
+	//"net/http/httptrace"
+	//"net/http/httputil"
+	//"net/http/internal/testcert"
 	"net/textproto"
 	"net/url"
 	"os"
@@ -45,6 +45,13 @@ import (
 	"time"
 
 	"golang.org/x/net/http/httpguts"
+
+	. "github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptest"
+	"github.com/chchleung/fhttp/http/httptrace"
+	"github.com/chchleung/fhttp/http/httputil"
+	"github.com/chchleung/fhttp/http/internal/nettrace"
+	"github.com/chchleung/fhttp/http/internal/testcert"
 )
 
 // TODO: test 5 pipelined requests with responses: 1) OK, 2) OK, Connection: Close

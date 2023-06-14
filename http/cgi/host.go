@@ -20,7 +20,7 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/http"
+	//"net/http"
 	"net/textproto"
 	"os"
 	"os/exec"
@@ -31,6 +31,8 @@ import (
 	"strings"
 
 	"golang.org/x/net/http/httpguts"
+
+	http "github.com/chchleung/fhttp/http"
 )
 
 var trailingPort = regexp.MustCompile(`:([0-9]+)$`)

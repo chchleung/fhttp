@@ -8,9 +8,11 @@ import (
 	"bufio"
 	"io"
 	"net"
-	"net/http"
+	//"net/http"
 	"sync"
 	"testing"
+
+	http "github.com/chchleung/fhttp/http"
 )
 
 type newServerFunc func(http.Handler) *Server

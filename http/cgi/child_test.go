@@ -9,10 +9,13 @@ package cgi
 import (
 	"bufio"
 	"bytes"
-	"net/http"
-	"net/http/httptest"
+	//"net/http"
+	//"net/http/httptest"
 	"strings"
 	"testing"
+
+	http "github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptest"
 )
 
 func TestRequest(t *testing.T) {

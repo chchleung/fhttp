@@ -7,8 +7,10 @@ package httptest
 import (
 	"fmt"
 	"io"
-	"net/http"
+	//"net/http"
 	"testing"
+
+	http "github.com/chchleung/fhttp/http"
 )
 
 func TestRecorder(t *testing.T) {

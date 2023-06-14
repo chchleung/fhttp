@@ -11,13 +11,15 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"net/http"
+	// "net/http"
 	"net/url"
 	"runtime"
 	"runtime/pprof"
 	"strings"
 	"testing"
 	"time"
+
+	http "github.com/chchleung/fhttp/http"
 )
 
 type eofReader struct{}

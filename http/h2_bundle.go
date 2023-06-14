@@ -35,7 +35,7 @@ import (
 	"math"
 	mathrand "math/rand"
 	"net"
-	"net/http/httptrace"
+	//"net/http/httptrace"
 	"net/textproto"
 	"net/url"
 	"os"
@@ -49,8 +49,12 @@ import (
 	"time"
 
 	"golang.org/x/net/http/httpguts"
-	"golang.org/x/net/http2/hpack"
+	//"golang.org/x/net/http2/hpack"
 	"golang.org/x/net/idna"
+	
+	"github.com/chchleung/fhttp/http/httptrace"
+	"github.com/chchleung/fhttp/http2/hpack"	
+	
 )
 
 // The HTTP protocols are defined in terms of ASCII, not Unicode. This file

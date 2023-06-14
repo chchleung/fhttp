@@ -14,9 +14,9 @@ import (
 	"log"
 	"mime"
 	"net"
-	"net/http"
-	"net/http/httptrace"
-	"net/http/internal/ascii"
+	//"net/http"
+	//"net/http/httptrace"
+	//"net/http/internal/ascii"
 	"net/textproto"
 	"net/url"
 	"strings"
@@ -24,6 +24,10 @@ import (
 	"time"
 
 	"golang.org/x/net/http/httpguts"
+	
+	http "github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptrace"
+	"github.com/chchleung/fhttp/http/internal/ascii"
 )
 
 // A ProxyRequest contains a request to be rewritten by a ReverseProxy.

@@ -8,11 +8,15 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
-	"net/http/httptest"
-	"net/http/httputil"
+	//"net/http"
+	//"net/http/httptest"
+	//"net/http/httputil"
 	"net/url"
 	"strings"
+
+	http "github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptest"
+	"github.com/chchleung/fhttp/http/httputil"
 )
 
 func ExampleDumpRequest() {

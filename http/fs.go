@@ -9,7 +9,7 @@ package http
 import (
 	"errors"
 	"fmt"
-	"internal/safefilepath"
+	//"internal/safefilepath"
 	"io"
 	"io/fs"
 	"mime"
@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/chchleung/fhttp/http/internal/safefilepath"
 )
 
 // A Dir implements FileSystem using the native file system restricted to a

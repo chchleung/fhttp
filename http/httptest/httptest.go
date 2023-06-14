@@ -10,8 +10,10 @@ import (
 	"bytes"
 	"crypto/tls"
 	"io"
-	"net/http"
+	//"net/http"
 	"strings"
+
+	http "github.com/chchleung/fhttp/http"
 )
 
 // NewRequest returns a new incoming server Request, suitable

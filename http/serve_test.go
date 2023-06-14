@@ -22,12 +22,12 @@ import (
 	"math/rand"
 	"mime/multipart"
 	"net"
-	. "net/http"
-	"net/http/httptest"
-	"net/http/httptrace"
-	"net/http/httputil"
-	"net/http/internal"
-	"net/http/internal/testcert"
+	//. "net/http"
+	//"net/http/httptest"
+	//"net/http/httptrace"
+	//"net/http/httputil"
+	//"net/http/internal"
+	//"net/http/internal/testcert"
 	"net/url"
 	"os"
 	"os/exec"
@@ -43,6 +43,13 @@ import (
 	"syscall"
 	"testing"
 	"time"
+	
+	. "github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptest"
+	"github.com/chchleung/fhttp/http/httptrace"
+	"github.com/chchleung/fhttp/http/httputil"
+	"github.com/chchleung/fhttp/http/internal"
+	"github.com/chchleung/fhttp/http/internal/testcert"
 )
 
 type dummyAddr string
