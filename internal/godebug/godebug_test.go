@@ -8,7 +8,7 @@ import (
 	//. "internal/godebug"
 	"testing"
 
-	. "github.com/chchleung/fhttp/http/internal/godebug"
+	. "github.com/chchleung/fhttp/internal/godebug"
 )
 
 func TestGet(t *testing.T) {

@@ -36,7 +36,7 @@ import (
 
 	"github.com/chchleung/fhttp/http/httptrace"
 	"github.com/chchleung/fhttp/http/internal/ascii"
-	"github.com/chchleung/fhttp/http/internal/godebug"
+	"github.com/chchleung/fhttp/internal/godebug"
 )
 
 // DefaultTransport is the default implementation of Transport and is

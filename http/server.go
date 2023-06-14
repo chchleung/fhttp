@@ -32,7 +32,7 @@ import (
 
 	"golang.org/x/net/http/httpguts"
 
-	"github.com/chchleung/fhttp/http/internal/godebug"
+	"github.com/chchleung/fhttp/internal/godebug"
 )
 
 // Errors used by the HTTP server.
