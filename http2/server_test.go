@@ -315,7 +315,7 @@ func (st *serverTester) greetAndCheckSettings(checkSetting func(s Setting) error
 			if f.FrameHeader.StreamID != 0 {
 				st.t.Fatalf("WindowUpdate StreamID = %d; want 0", f.FrameHeader.StreamID)
 			}
-			incr := uint32(st.sc.srv.initialConnRecvWindowSize() - initialWindowSize)
+			incr := uint32((&Server{}).initialConnRecvWindowSize() - initialWindowSize)
 			if f.Increment != incr {
 				st.t.Fatalf("WindowUpdate increment = %d; want %d", f.Increment, incr)
 			}
@@ -346,10 +346,6 @@ func (st *serverTester) writePreface() {
 
 func (st *serverTester) writeInitialSettings() {
 	if err := st.fr.WriteSettings(); err != nil {
-		if runtime.GOOS == "openbsd" && strings.HasSuffix(err.Error(), "write: broken pipe") {
-			st.t.Logf("Error writing initial SETTINGS frame from client to server: %v", err)
-			st.t.Skipf("Skipping test with known OpenBSD failure mode. (See https://go.dev/issue/52208.)")
-		}
 		st.t.Fatalf("Error writing initial SETTINGS frame from client to server: %v", err)
 	}
 }
@@ -482,24 +478,31 @@ func (st *serverTester) writeDataPadded(streamID uint32, endStream bool, data, p
 	}
 }
 
-// writeReadPing sends a PING and immediately reads the PING ACK.
-// It will fail if any other unread data was pending on the connection.
-func (st *serverTester) writeReadPing() {
-	data := [8]byte{1, 2, 3, 4, 5, 6, 7, 8}
-	if err := st.fr.WritePing(false, data); err != nil {
-		st.t.Fatalf("Error writing PING: %v", err)
-	}
-	p := st.wantPing()
-	if p.Flags&FlagPingAck == 0 {
-		st.t.Fatalf("got a PING, want a PING ACK")
-	}
-	if p.Data != data {
-		st.t.Fatalf("got PING data = %x, want %x", p.Data, data)
+func readFrameTimeout(fr *Framer, wait time.Duration) (Frame, error) {
+	ch := make(chan interface{}, 1)
+	go func() {
+		fr, err := fr.ReadFrame()
+		if err != nil {
+			ch <- err
+		} else {
+			ch <- fr
+		}
+	}()
+	t := time.NewTimer(wait)
+	select {
+	case v := <-ch:
+		t.Stop()
+		if fr, ok := v.(Frame); ok {
+			return fr, nil
+		}
+		return nil, v.(error)
+	case <-t.C:
+		return nil, errors.New("timeout waiting for frame")
 	}
 }
 
 func (st *serverTester) readFrame() (Frame, error) {
-	return st.fr.ReadFrame()
+	return readFrameTimeout(st.fr, 2*time.Second)
 }
 
 func (st *serverTester) wantHeaders() *HeadersFrame {
@@ -608,28 +611,6 @@ func (st *serverTester) wantWindowUpdate(streamID, incr uint32) {
 	}
 }
 
-func (st *serverTester) wantFlowControlConsumed(streamID, consumed int32) {
-	var initial int32
-	if streamID == 0 {
-		initial = st.sc.srv.initialConnRecvWindowSize()
-	} else {
-		initial = st.sc.srv.initialStreamRecvWindowSize()
-	}
-	donec := make(chan struct{})
-	st.sc.sendServeMsg(func(sc *serverConn) {
-		defer close(donec)
-		var avail int32
-		if streamID == 0 {
-			avail = sc.inflow.avail + sc.inflow.unsent
-		} else {
-		}
-		if got, want := initial-avail, consumed; got != want {
-			st.t.Errorf("stream %v flow control consumed: %v, want %v", streamID, got, want)
-		}
-	})
-	<-donec
-}
-
 func (st *serverTester) wantSettingsAck() {
 	f, err := st.readFrame()
 	if err != nil {
@@ -678,7 +659,11 @@ func TestServer(t *testing.T) {
 		EndHeaders:    true,
 	})
 
-	<-gotReq
+	select {
+	case <-gotReq:
+	case <-time.After(2 * time.Second):
+		t.Error("timeout waiting for request")
+	}
 }
 
 func TestServer_Request_Get(t *testing.T) {
@@ -847,10 +832,6 @@ func TestServer_Request_Post_Body_ContentLength_TooSmall(t *testing.T) {
 				EndHeaders: true,
 			})
 			st.writeData(1, true, []byte("12345"))
-			// Return flow control bytes back, since the data handler closed
-			// the stream.
-			st.wantRSTStream(1, ErrCodeProtocol)
-			st.wantFlowControlConsumed(0, 0)
 		})
 }
 
@@ -1277,89 +1258,69 @@ func TestServer_RejectsLargeFrames(t *testing.T) {
 }
 
 func TestServer_Handler_Sends_WindowUpdate(t *testing.T) {
-	// Need to set this to at least twice the initial window size,
-	// or st.greet gets stuck waiting for a WINDOW_UPDATE.
-	//
-	// This also needs to be less than MAX_FRAME_SIZE.
-	const windowSize = 65535 * 2
 	puppet := newHandlerPuppet()
 	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
 		puppet.act(w, r)
-	}, func(s *Server) {
-		s.MaxUploadBufferPerConnection = windowSize
-		s.MaxUploadBufferPerStream = windowSize
 	})
 	defer st.Close()
 	defer puppet.done()
 
 	st.greet()
+
 	st.writeHeaders(HeadersFrameParam{
 		StreamID:      1, // clients send odd numbers
 		BlockFragment: st.encodeHeader(":method", "POST"),
 		EndStream:     false, // data coming
 		EndHeaders:    true,
 	})
-	st.writeReadPing()
+	st.writeData(1, false, []byte("abcdef"))
+	puppet.do(readBodyHandler(t, "abc"))
+	st.wantWindowUpdate(0, 3)
+	st.wantWindowUpdate(1, 3)
 
-	// Write less than half the max window of data and consume it.
-	// The server doesn't return flow control yet, buffering the 1024 bytes to
-	// combine with a future update.
-	data := make([]byte, windowSize)
-	st.writeData(1, false, data[:1024])
-	puppet.do(readBodyHandler(t, string(data[:1024])))
-	st.writeReadPing()
+	puppet.do(readBodyHandler(t, "def"))
+	st.wantWindowUpdate(0, 3)
+	st.wantWindowUpdate(1, 3)
 
-	// Write up to the window limit.
-	// The server returns the buffered credit.
-	st.writeData(1, false, data[1024:])
-	st.wantWindowUpdate(0, 1024)
-	st.wantWindowUpdate(1, 1024)
-	st.writeReadPing()
-
-	// The handler consumes the data and the server returns credit.
-	puppet.do(readBodyHandler(t, string(data[1024:])))
-	st.wantWindowUpdate(0, windowSize-1024)
-	st.wantWindowUpdate(1, windowSize-1024)
-	st.writeReadPing()
+	st.writeData(1, true, []byte("ghijkl")) // END_STREAM here
+	puppet.do(readBodyHandler(t, "ghi"))
+	puppet.do(readBodyHandler(t, "jkl"))
+	st.wantWindowUpdate(0, 3)
+	st.wantWindowUpdate(0, 3) // no more stream-level, since END_STREAM
 }
 
 // the version of the TestServer_Handler_Sends_WindowUpdate with padding.
 // See golang.org/issue/16556
 func TestServer_Handler_Sends_WindowUpdate_Padding(t *testing.T) {
-	const windowSize = 65535 * 2
 	puppet := newHandlerPuppet()
 	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
 		puppet.act(w, r)
-	}, func(s *Server) {
-		s.MaxUploadBufferPerConnection = windowSize
-		s.MaxUploadBufferPerStream = windowSize
 	})
 	defer st.Close()
 	defer puppet.done()
 
 	st.greet()
+
 	st.writeHeaders(HeadersFrameParam{
 		StreamID:      1,
 		BlockFragment: st.encodeHeader(":method", "POST"),
 		EndStream:     false,
 		EndHeaders:    true,
 	})
-	st.writeReadPing()
+	st.writeDataPadded(1, false, []byte("abcdef"), []byte{0, 0, 0, 0})
 
-	// Write half a window of data, with some padding.
-	// The server doesn't return the padding yet, buffering the 5 bytes to combine
-	// with a future update.
-	data := make([]byte, windowSize/2)
-	pad := make([]byte, 4)
-	st.writeDataPadded(1, false, data, pad)
-	st.writeReadPing()
+	// Expect to immediately get our 5 bytes of padding back for
+	// both the connection and stream (4 bytes of padding + 1 byte of length)
+	st.wantWindowUpdate(0, 5)
+	st.wantWindowUpdate(1, 5)
 
-	// The handler consumes the body.
-	// The server returns flow control for the body and padding
-	// (4 bytes of padding + 1 byte of length).
-	puppet.do(readBodyHandler(t, string(data)))
-	st.wantWindowUpdate(0, uint32(len(data)+1+len(pad)))
-	st.wantWindowUpdate(1, uint32(len(data)+1+len(pad)))
+	puppet.do(readBodyHandler(t, "abc"))
+	st.wantWindowUpdate(0, 3)
+	st.wantWindowUpdate(1, 3)
+
+	puppet.do(readBodyHandler(t, "def"))
+	st.wantWindowUpdate(0, 3)
+	st.wantWindowUpdate(1, 3)
 }
 
 func TestServer_Send_GoAway_After_Bogus_WindowUpdate(t *testing.T) {
@@ -1426,9 +1387,13 @@ func testServerPostUnblock(t *testing.T,
 	})
 	<-inHandler
 	fn(st)
-	err := <-errc
-	if checkErr != nil {
-		checkErr(err)
+	select {
+	case err := <-errc:
+		if checkErr != nil {
+			checkErr(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for Handler to return")
 	}
 }
 
@@ -1494,7 +1459,11 @@ func testServer_RSTStream_Unblocks_Header_Write(t *testing.T) {
 	}
 	wroteRST <- true
 	st.awaitIdle()
-	<-headerWritten
+	select {
+	case <-headerWritten:
+	case <-time.After(2 * time.Second):
+		t.Error("timeout waiting for header write")
+	}
 	unblockHandler <- true
 }
 
@@ -1704,7 +1673,7 @@ func TestServer_Rejects_HeadersSelfDependence(t *testing.T) {
 	})
 }
 
-// No PRIORITY frame with a self-dependence.
+// No PRIORTY frame with a self-dependence.
 func TestServer_Rejects_PrioritySelfDependence(t *testing.T) {
 	testServerRejectsStream(t, ErrCodeProtocol, func(st *serverTester) {
 		st.fr.AllowIllegalWrites = true
@@ -1735,13 +1704,21 @@ func testServerRejectsConn(t *testing.T, writeReq func(*serverTester)) {
 	writeReq(st)
 
 	st.wantGoAway()
-
-	fr, err := st.fr.ReadFrame()
-	if err == nil {
-		t.Errorf("ReadFrame got frame of type %T; want io.EOF", fr)
-	}
-	if err != io.EOF {
-		t.Errorf("ReadFrame = %v; want io.EOF", err)
+	errc := make(chan error, 1)
+	go func() {
+		fr, err := st.fr.ReadFrame()
+		if err == nil {
+			err = fmt.Errorf("got frame of type %T", fr)
+		}
+		errc <- err
+	}()
+	select {
+	case err := <-errc:
+		if err != io.EOF {
+			t.Errorf("ReadFrame = %v; want io.EOF", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("timeout waiting for disconnect")
 	}
 }
 
@@ -1771,7 +1748,12 @@ func testServerRequest(t *testing.T, writeReq func(*serverTester), checkReq func
 
 	st.greet()
 	writeReq(st)
-	<-gotReq
+
+	select {
+	case <-gotReq:
+	case <-time.After(2 * time.Second):
+		t.Error("timeout waiting for request")
+	}
 }
 
 func getSlash(st *serverTester) { st.bodylessReq1() }
@@ -2253,11 +2235,20 @@ func TestServer_Response_RST_Unblocks_LargeWrite(t *testing.T) {
 	const maxFrameSize = 16 << 10
 	testServerResponse(t, func(w http.ResponseWriter, r *http.Request) error {
 		w.(http.Flusher).Flush()
-		_, err := w.Write(bytes.Repeat([]byte("a"), size))
-		if err == nil {
-			return errors.New("unexpected nil error from Write in handler")
+		errc := make(chan error, 1)
+		go func() {
+			_, err := w.Write(bytes.Repeat([]byte("a"), size))
+			errc <- err
+		}()
+		select {
+		case err := <-errc:
+			if err == nil {
+				return errors.New("unexpected nil error from Write in handler")
+			}
+			return nil
+		case <-time.After(2 * time.Second):
+			return errors.New("timeout waiting for Write in handler")
 		}
-		return nil
 	}, func(st *serverTester) {
 		if err := st.fr.WriteSettings(
 			Setting{SettingInitialWindowSize, 0},
@@ -2332,7 +2323,7 @@ func TestServer_Response_Automatic100Continue(t *testing.T) {
 	}, func(st *serverTester) {
 		st.writeHeaders(HeadersFrameParam{
 			StreamID:      1, // clients send odd numbers
-			BlockFragment: st.encodeHeader(":method", "POST", "expect", "100-Continue"),
+			BlockFragment: st.encodeHeader(":method", "POST", "expect", "100-continue"),
 			EndStream:     false,
 			EndHeaders:    true,
 		})
@@ -2354,6 +2345,8 @@ func TestServer_Response_Automatic100Continue(t *testing.T) {
 		// Okay, they sent status 100, so we can send our
 		// gigantic and/or sensitive "foo" payload now.
 		st.writeData(1, true, []byte(msg))
+
+		st.wantWindowUpdate(0, uint32(len(msg)))
 
 		hf = st.wantHeaders()
 		if hf.StreamEnded() {
@@ -2409,7 +2402,11 @@ func TestServer_HandlerWriteErrorOnDisconnect(t *testing.T) {
 		}
 		// Close the connection and wait for the handler to (hopefully) notice.
 		st.cc.Close()
-		_ = <-errc
+		select {
+		case <-errc:
+		case <-time.After(5 * time.Second):
+			t.Error("timeout")
+		}
 	})
 }
 
@@ -2475,8 +2472,13 @@ func TestServer_Rejects_Too_Many_Streams(t *testing.T) {
 	// And now another stream should be able to start:
 	goodID := streamID()
 	sendReq(goodID, ":path", testPath)
-	if got := <-inHandler; got != goodID {
-		t.Errorf("Got stream %d; want %d", got, goodID)
+	select {
+	case got := <-inHandler:
+		if got != goodID {
+			t.Errorf("Got stream %d; want %d", got, goodID)
+		}
+	case <-time.After(3 * time.Second):
+		t.Error("timeout waiting for handler")
 	}
 }
 
@@ -2542,15 +2544,14 @@ func TestServer_NoCrash_HandlerClose_Then_ClientClose(t *testing.T) {
 		// it did before.
 		st.writeData(1, true, []byte("foo"))
 
+		// Get our flow control bytes back, since the handler didn't get them.
+		st.wantWindowUpdate(0, uint32(len("foo")))
+
 		// Sent after a peer sends data anyway (admittedly the
 		// previous RST_STREAM might've still been in-flight),
 		// but they'll get the more friendly 'cancel' code
 		// first.
 		st.wantRSTStream(1, ErrCodeStreamClosed)
-
-		// We should have our flow control bytes back,
-		// since the handler didn't get them.
-		st.wantFlowControlConsumed(0, 0)
 
 		// Set up a bunch of machinery to record the panic we saw
 		// previously.
@@ -2570,13 +2571,17 @@ func TestServer_NoCrash_HandlerClose_Then_ClientClose(t *testing.T) {
 
 		// Now force the serve loop to end, via closing the connection.
 		st.cc.Close()
-		<-st.sc.doneServing
-
-		panMu.Lock()
-		got := panicVal
-		panMu.Unlock()
-		if got != nil {
-			t.Errorf("Got panic: %v", got)
+		select {
+		case <-st.sc.doneServing:
+			// Loop has exited.
+			panMu.Lock()
+			got := panicVal
+			panMu.Unlock()
+			if got != nil {
+				t.Errorf("Got panic: %v", got)
+			}
+		case <-time.After(5 * time.Second):
+			t.Error("timeout")
 		}
 	})
 }
@@ -2660,7 +2665,8 @@ func (st *serverTester) decodeHeader(headerBlock []byte) (pairs [][2]string) {
 }
 
 // testServerResponse sets up an idle HTTP/2 connection. The client function should
-// write a single request that must be handled by the handler.
+// write a single request that must be handled by the handler. This waits up to 5s
+// for client to return, then up to an additional 2s for the handler to return.
 func testServerResponse(t testing.TB,
 	handler func(http.ResponseWriter, *http.Request) error,
 	client func(*serverTester),
@@ -2670,20 +2676,30 @@ func testServerResponse(t testing.TB,
 		if r.Body == nil {
 			t.Fatal("nil Body")
 		}
-		err := handler(w, r)
-		select {
-		case errc <- err:
-		default:
-			t.Errorf("unexpected duplicate request")
-		}
+		errc <- handler(w, r)
 	})
 	defer st.Close()
 
-	st.greet()
-	client(st)
+	donec := make(chan bool)
+	go func() {
+		defer close(donec)
+		st.greet()
+		client(st)
+	}()
 
-	if err := <-errc; err != nil {
-		t.Fatalf("Error in handler: %v", err)
+	select {
+	case <-donec:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout in client")
+	}
+
+	select {
+	case err := <-errc:
+		if err != nil {
+			t.Fatalf("Error in handler: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout in handler")
 	}
 }
 
@@ -2705,9 +2721,8 @@ func readBodyHandler(t *testing.T, want string) func(w http.ResponseWriter, r *h
 }
 
 // TestServerWithCurl currently fails, hence the LenientCipherSuites test. See:
-//
-//	https://github.com/tatsuhiro-t/nghttp2/issues/140 &
-//	http://sourceforge.net/p/curl/bugs/1472/
+//   https://github.com/tatsuhiro-t/nghttp2/issues/140 &
+//   http://sourceforge.net/p/curl/bugs/1472/
 func TestServerWithCurl(t *testing.T)                     { testServerWithCurl(t, false) }
 func TestServerWithCurl_LenientCipherSuites(t *testing.T) { testServerWithCurl(t, true) }
 
@@ -2738,26 +2753,38 @@ func testServerWithCurl(t *testing.T, permitProhibitedCipherSuites bool) {
 	t.Logf("Running test server for curl to hit at: %s", ts.URL)
 	container := curl(t, "--silent", "--http2", "--insecure", "-v", ts.URL)
 	defer kill(container)
-	res, err := dockerLogs(container)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	body := string(res)
-	// Search for both "key: value" and "key:value", since curl changed their format
-	// Our Dockerfile contains the latest version (no space), but just in case people
-	// didn't rebuild, check both.
-	if !strings.Contains(body, "foo: Bar") && !strings.Contains(body, "foo:Bar") {
-		t.Errorf("didn't see foo: Bar header")
-		t.Logf("Got: %s", body)
-	}
-	if !strings.Contains(body, "client-proto: HTTP/2") && !strings.Contains(body, "client-proto:HTTP/2") {
-		t.Errorf("didn't see client-proto: HTTP/2 header")
-		t.Logf("Got: %s", res)
-	}
-	if !strings.Contains(string(res), msg) {
-		t.Errorf("didn't see %q content", msg)
-		t.Logf("Got: %s", res)
+	resc := make(chan interface{}, 1)
+	go func() {
+		res, err := dockerLogs(container)
+		if err != nil {
+			resc <- err
+		} else {
+			resc <- res
+		}
+	}()
+	select {
+	case res := <-resc:
+		if err, ok := res.(error); ok {
+			t.Fatal(err)
+		}
+		body := string(res.([]byte))
+		// Search for both "key: value" and "key:value", since curl changed their format
+		// Our Dockerfile contains the latest version (no space), but just in case people
+		// didn't rebuild, check both.
+		if !strings.Contains(body, "foo: Bar") && !strings.Contains(body, "foo:Bar") {
+			t.Errorf("didn't see foo: Bar header")
+			t.Logf("Got: %s", body)
+		}
+		if !strings.Contains(body, "client-proto: HTTP/2") && !strings.Contains(body, "client-proto:HTTP/2") {
+			t.Errorf("didn't see client-proto: HTTP/2 header")
+			t.Logf("Got: %s", res)
+		}
+		if !strings.Contains(string(res.([]byte)), msg) {
+			t.Errorf("didn't see %q content", msg)
+			t.Logf("Got: %s", res)
+		}
+	case <-time.After(3 * time.Second):
+		t.Errorf("timeout waiting for curl")
 	}
 
 	if atomic.LoadInt32(&gotConn) == 0 {
@@ -2791,43 +2818,6 @@ func TestServerWithH2Load(t *testing.T) {
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestServer_MaxDecoderHeaderTableSize(t *testing.T) {
-	wantHeaderTableSize := uint32(initialHeaderTableSize * 2)
-	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {}, func(s *Server) {
-		s.MaxDecoderHeaderTableSize = wantHeaderTableSize
-	})
-	defer st.Close()
-
-	var advHeaderTableSize *uint32
-	st.greetAndCheckSettings(func(s Setting) error {
-		switch s.ID {
-		case SettingHeaderTableSize:
-			advHeaderTableSize = &s.Val
-		}
-		return nil
-	})
-
-	if advHeaderTableSize == nil {
-		t.Errorf("server didn't advertise a header table size")
-	} else if got, want := *advHeaderTableSize, wantHeaderTableSize; got != want {
-		t.Errorf("server advertised a header table size of %d, want %d", got, want)
-	}
-}
-
-func TestServer_MaxEncoderHeaderTableSize(t *testing.T) {
-	wantHeaderTableSize := uint32(initialHeaderTableSize / 2)
-	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {}, func(s *Server) {
-		s.MaxEncoderHeaderTableSize = wantHeaderTableSize
-	})
-	defer st.Close()
-
-	st.greet()
-
-	if got, want := st.sc.hpackEncoder.MaxDynamicTableSize(), wantHeaderTableSize; got != want {
-		t.Errorf("server encoder is using a header table size of %d, want %d", got, want)
 	}
 }
 
@@ -3148,30 +3138,6 @@ func testServerWritesTrailers(t *testing.T, withFlush bool) {
 			t.Errorf("Header mismatch.\n got: %v\nwant: %v", goth, wanth)
 		}
 	})
-}
-
-func TestServerWritesUndeclaredTrailers(t *testing.T) {
-	const trailer = "Trailer-Header"
-	const value = "hi1"
-	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(http.TrailerPrefix+trailer, value)
-	}, optOnlyServer)
-	defer st.Close()
-
-	tr := &Transport{TLSClientConfig: tlsConfigInsecure}
-	defer tr.CloseIdleConnections()
-
-	cl := &http.Client{Transport: tr}
-	resp, err := cl.Get(st.ts.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
-
-	if got, want := resp.Trailer.Get(trailer), value; got != want {
-		t.Errorf("trailer %v = %q, want %q", trailer, got, want)
-	}
 }
 
 // validate transmitted header field names & values
@@ -3507,6 +3473,21 @@ func TestConfigureServer(t *testing.T) {
 	}
 }
 
+func TestServerRejectHeadWithBody(t *testing.T) {
+	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
+		// No response body.
+	})
+	defer st.Close()
+	st.greet()
+	st.writeHeaders(HeadersFrameParam{
+		StreamID:      1, // clients send odd numbers
+		BlockFragment: st.encodeHeader(":method", "HEAD"),
+		EndStream:     false, // what we're testing, a bogus HEAD request with body
+		EndHeaders:    true,
+	})
+	st.wantRSTStream(1, ErrCodeProtocol)
+}
+
 func TestServerNoAutoContentLengthOnHead(t *testing.T) {
 	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
 		// No response body. (or smaller than one frame)
@@ -3688,8 +3669,11 @@ func TestServerHandleCustomConn(t *testing.T) {
 				req = r
 			}),
 		}})
-	<-clientDone
-
+	select {
+	case <-clientDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for handler")
+	}
 	if req.TLS == nil {
 		t.Fatalf("Request.TLS is nil. Got: %#v", req)
 	}
@@ -3870,12 +3854,18 @@ func TestUnreadFlowControlReturned_Server(t *testing.T) {
 			unblock := make(chan bool, 1)
 			defer close(unblock)
 
+			timeOut := time.NewTimer(5 * time.Second)
+			defer timeOut.Stop()
 			st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
 				// Don't read the 16KB request body. Wait until the client's
 				// done sending it and then return. This should cause the Server
 				// to then return those 16KB of flow control to the client.
 				tt.reqFn(r)
-				<-unblock
+				select {
+				case <-unblock:
+				case <-timeOut.C:
+					t.Fatal(tt.name, "timedout")
+				}
 			}, optOnlyServer)
 			defer st.Close()
 
@@ -3904,32 +3894,6 @@ func TestUnreadFlowControlReturned_Server(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestServerReturnsStreamAndConnFlowControlOnBodyClose(t *testing.T) {
-	unblockHandler := make(chan struct{})
-	defer close(unblockHandler)
-
-	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
-		r.Body.Close()
-		w.WriteHeader(200)
-		w.(http.Flusher).Flush()
-		<-unblockHandler
-	})
-	defer st.Close()
-
-	st.greet()
-	st.writeHeaders(HeadersFrameParam{
-		StreamID:      1,
-		BlockFragment: st.encodeHeader(),
-		EndHeaders:    true,
-	})
-	st.wantHeaders()
-	const size = inflowMinRefresh // enough to trigger flow control return
-	st.writeData(1, false, make([]byte, size))
-	st.wantWindowUpdate(0, size) // conn-level flow control is returned
-	unblockHandler <- struct{}{}
-	st.wantData()
 }
 
 func TestServerIdleTimeout(t *testing.T) {
@@ -4051,8 +4015,8 @@ func TestServer_Rejects_TooSmall(t *testing.T) {
 			EndHeaders: true,
 		})
 		st.writeData(1, true, []byte("12345"))
+
 		st.wantRSTStream(1, ErrCodeProtocol)
-		st.wantFlowControlConsumed(0, 0)
 	})
 }
 
@@ -4060,6 +4024,7 @@ func TestServer_Rejects_TooSmall(t *testing.T) {
 // and the connection still completing.
 func TestServerHandlerConnectionClose(t *testing.T) {
 	unblockHandler := make(chan bool, 1)
+	defer close(unblockHandler) // backup; in case of errors
 	testServerResponse(t, func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Connection", "close")
 		w.Header().Set("Foo", "bar")
@@ -4067,7 +4032,6 @@ func TestServerHandlerConnectionClose(t *testing.T) {
 		<-unblockHandler
 		return nil
 	}, func(st *serverTester) {
-		defer close(unblockHandler) // backup; in case of errors
 		st.writeHeaders(HeadersFrameParam{
 			StreamID:      1,
 			BlockFragment: st.encodeHeader(),
@@ -4076,7 +4040,6 @@ func TestServerHandlerConnectionClose(t *testing.T) {
 		})
 		var sawGoAway bool
 		var sawRes bool
-		var sawWindowUpdate bool
 		for {
 			f, err := st.readFrame()
 			if err == io.EOF {
@@ -4088,29 +4051,10 @@ func TestServerHandlerConnectionClose(t *testing.T) {
 			switch f := f.(type) {
 			case *GoAwayFrame:
 				sawGoAway = true
+				unblockHandler <- true
 				if f.LastStreamID != 1 || f.ErrCode != ErrCodeNo {
 					t.Errorf("unexpected GOAWAY frame: %v", summarizeFrame(f))
 				}
-				// Create a stream and reset it.
-				// The server should ignore the stream.
-				st.writeHeaders(HeadersFrameParam{
-					StreamID:      3,
-					BlockFragment: st.encodeHeader(),
-					EndStream:     false,
-					EndHeaders:    true,
-				})
-				st.fr.WriteRSTStream(3, ErrCodeCancel)
-				// Create a stream and send data to it.
-				// The server should return flow control, even though it
-				// does not process the stream.
-				st.writeHeaders(HeadersFrameParam{
-					StreamID:      5,
-					BlockFragment: st.encodeHeader(),
-					EndStream:     false,
-					EndHeaders:    true,
-				})
-				// Write enough data to trigger a window update.
-				st.writeData(5, true, make([]byte, 1<<19))
 			case *HeadersFrame:
 				goth := st.decodeHeader(f.HeaderBlockFragment())
 				wanth := [][2]string{
@@ -4125,17 +4069,6 @@ func TestServerHandlerConnectionClose(t *testing.T) {
 				if f.StreamID != 1 || !f.StreamEnded() || len(f.Data()) != 0 {
 					t.Errorf("unexpected DATA frame: %v", summarizeFrame(f))
 				}
-			case *WindowUpdateFrame:
-				if !sawGoAway {
-					t.Errorf("unexpected WINDOW_UPDATE frame: %v", summarizeFrame(f))
-					return
-				}
-				if f.StreamID != 0 {
-					st.t.Fatalf("WindowUpdate StreamID = %d; want 5", f.FrameHeader.StreamID)
-					return
-				}
-				sawWindowUpdate = true
-				unblockHandler <- true
 			default:
 				t.Logf("unexpected frame: %v", summarizeFrame(f))
 			}
@@ -4145,9 +4078,6 @@ func TestServerHandlerConnectionClose(t *testing.T) {
 		}
 		if !sawRes {
 			t.Errorf("didn't see response")
-		}
-		if !sawWindowUpdate {
-			t.Errorf("didn't see WINDOW_UPDATE")
 		}
 	})
 }
@@ -4222,7 +4152,11 @@ func TestServerGracefulShutdown(t *testing.T) {
 	st.greet()
 	st.bodylessReq1()
 
-	<-handlerDone
+	select {
+	case <-handlerDone:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("server did not shutdown?")
+	}
 	hf := st.wantHeaders()
 	goth := st.decodeHeader(hf.HeaderBlockFragment())
 	wanth := [][2]string{
@@ -4301,6 +4235,9 @@ func TestContentEncodingNoSniffing(t *testing.T) {
 		},
 	}
 
+	tr := &Transport{TLSClientConfig: tlsConfigInsecure}
+	defer tr.CloseIdleConnections()
+
 	for _, tt := range resps {
 		t.Run(tt.name, func(t *testing.T) {
 			st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
@@ -4311,39 +4248,28 @@ func TestContentEncodingNoSniffing(t *testing.T) {
 			}, optOnlyServer)
 			defer st.Close()
 
-			tr := &Transport{TLSClientConfig: tlsConfigInsecure}
-			defer tr.CloseIdleConnections()
-
 			req, _ := http.NewRequest("GET", st.ts.URL, nil)
 			res, err := tr.RoundTrip(req)
 			if err != nil {
-				t.Fatalf("GET %s: %v", st.ts.URL, err)
+				t.Fatalf("Failed to fetch URL: %v", err)
 			}
 			defer res.Body.Close()
-
-			g := res.Header.Get("Content-Encoding")
-			t.Logf("%s: Content-Encoding: %s", st.ts.URL, g)
-
-			if w := tt.contentEncoding; g != w {
+			if g, w := res.Header.Get("Content-Encoding"), tt.contentEncoding; g != w {
 				if w != nil { // The case where contentEncoding was set explicitly.
 					t.Errorf("Content-Encoding mismatch\n\tgot:  %q\n\twant: %q", g, w)
 				} else if g != "" { // "" should be the equivalent when the contentEncoding is unset.
 					t.Errorf("Unexpected Content-Encoding %q", g)
 				}
 			}
-
-			g = res.Header.Get("Content-Type")
-			if w := tt.wantContentType; g != w {
+			if g, w := res.Header.Get("Content-Type"), tt.wantContentType; g != w {
 				t.Errorf("Content-Type mismatch\n\tgot:  %q\n\twant: %q", g, w)
 			}
-			t.Logf("%s: Content-Type: %s", st.ts.URL, g)
 		})
 	}
 }
 
 func TestServerWindowUpdateOnBodyClose(t *testing.T) {
-	const windowSize = 65535 * 2
-	content := make([]byte, windowSize)
+	const content = "12345678"
 	blockCh := make(chan bool)
 	errc := make(chan error, 1)
 	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
@@ -4360,9 +4286,6 @@ func TestServerWindowUpdateOnBodyClose(t *testing.T) {
 		blockCh <- true
 		<-blockCh
 		errc <- nil
-	}, func(s *Server) {
-		s.MaxUploadBufferPerConnection = windowSize
-		s.MaxUploadBufferPerStream = windowSize
 	})
 	defer st.Close()
 
@@ -4376,13 +4299,13 @@ func TestServerWindowUpdateOnBodyClose(t *testing.T) {
 		EndStream:  false, // to say DATA frames are coming
 		EndHeaders: true,
 	})
-	st.writeData(1, false, content[:windowSize/2])
+	st.writeData(1, false, []byte(content[:5]))
 	<-blockCh
 	st.stream(1).body.CloseWithError(io.EOF)
+	st.writeData(1, false, []byte(content[5:]))
 	blockCh <- true
 
-	// Wait for flow control credit for the portion of the request written so far.
-	increments := windowSize / 2
+	increments := len(content)
 	for {
 		f, err := st.readFrame()
 		if err == io.EOF {
@@ -4398,10 +4321,6 @@ func TestServerWindowUpdateOnBodyClose(t *testing.T) {
 			}
 		}
 	}
-
-	// Writing data after the stream is reset immediately returns flow control credit.
-	st.writeData(1, false, content[windowSize/2:])
-	st.wantWindowUpdate(0, windowSize/2)
 
 	if err := <-errc; err != nil {
 		t.Error(err)
@@ -4447,288 +4366,4 @@ func TestNoErrorLoggedOnPostAfterGOAWAY(t *testing.T) {
 	if bytes.Contains(st.serverLogBuf.Bytes(), []byte("PROTOCOL_ERROR")) {
 		t.Error("got protocol error")
 	}
-}
-
-func TestServerSendsProcessing(t *testing.T) {
-	testServerResponse(t, func(w http.ResponseWriter, r *http.Request) error {
-		w.WriteHeader(http.StatusProcessing)
-		w.Write([]byte("stuff"))
-
-		return nil
-	}, func(st *serverTester) {
-		getSlash(st)
-		hf := st.wantHeaders()
-		goth := st.decodeHeader(hf.HeaderBlockFragment())
-		wanth := [][2]string{
-			{":status", "102"},
-		}
-
-		if !reflect.DeepEqual(goth, wanth) {
-			t.Errorf("Got = %q; want %q", goth, wanth)
-		}
-
-		hf = st.wantHeaders()
-		goth = st.decodeHeader(hf.HeaderBlockFragment())
-		wanth = [][2]string{
-			{":status", "200"},
-			{"content-type", "text/plain; charset=utf-8"},
-			{"content-length", "5"},
-		}
-
-		if !reflect.DeepEqual(goth, wanth) {
-			t.Errorf("Got = %q; want %q", goth, wanth)
-		}
-	})
-}
-
-func TestServerSendsEarlyHints(t *testing.T) {
-	testServerResponse(t, func(w http.ResponseWriter, r *http.Request) error {
-		h := w.Header()
-		h.Add("Content-Length", "123")
-		h.Add("Link", "</style.css>; rel=preload; as=style")
-		h.Add("Link", "</script.js>; rel=preload; as=script")
-		w.WriteHeader(http.StatusEarlyHints)
-
-		h.Add("Link", "</foo.js>; rel=preload; as=script")
-		w.WriteHeader(http.StatusEarlyHints)
-
-		w.Write([]byte("stuff"))
-
-		return nil
-	}, func(st *serverTester) {
-		getSlash(st)
-		hf := st.wantHeaders()
-		goth := st.decodeHeader(hf.HeaderBlockFragment())
-		wanth := [][2]string{
-			{":status", "103"},
-			{"link", "</style.css>; rel=preload; as=style"},
-			{"link", "</script.js>; rel=preload; as=script"},
-		}
-
-		if !reflect.DeepEqual(goth, wanth) {
-			t.Errorf("Got = %q; want %q", goth, wanth)
-		}
-
-		hf = st.wantHeaders()
-		goth = st.decodeHeader(hf.HeaderBlockFragment())
-		wanth = [][2]string{
-			{":status", "103"},
-			{"link", "</style.css>; rel=preload; as=style"},
-			{"link", "</script.js>; rel=preload; as=script"},
-			{"link", "</foo.js>; rel=preload; as=script"},
-		}
-
-		if !reflect.DeepEqual(goth, wanth) {
-			t.Errorf("Got = %q; want %q", goth, wanth)
-		}
-
-		hf = st.wantHeaders()
-		goth = st.decodeHeader(hf.HeaderBlockFragment())
-		wanth = [][2]string{
-			{":status", "200"},
-			{"link", "</style.css>; rel=preload; as=style"},
-			{"link", "</script.js>; rel=preload; as=script"},
-			{"link", "</foo.js>; rel=preload; as=script"},
-			{"content-type", "text/plain; charset=utf-8"},
-			{"content-length", "123"},
-		}
-
-		if !reflect.DeepEqual(goth, wanth) {
-			t.Errorf("Got = %q; want %q", goth, wanth)
-		}
-	})
-}
-
-func TestProtocolErrorAfterGoAway(t *testing.T) {
-	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
-		io.Copy(io.Discard, r.Body)
-	})
-	defer st.Close()
-
-	st.greet()
-	content := "some content"
-	st.writeHeaders(HeadersFrameParam{
-		StreamID: 1,
-		BlockFragment: st.encodeHeader(
-			":method", "POST",
-			"content-length", strconv.Itoa(len(content)),
-		),
-		EndStream:  false,
-		EndHeaders: true,
-	})
-	st.writeData(1, false, []byte(content[:5]))
-	st.writeReadPing()
-
-	// Send a GOAWAY with ErrCodeNo, followed by a bogus window update.
-	// The server should close the connection.
-	if err := st.fr.WriteGoAway(1, ErrCodeNo, nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.fr.WriteWindowUpdate(0, 1<<31-1); err != nil {
-		t.Fatal(err)
-	}
-
-	for {
-		if _, err := st.readFrame(); err != nil {
-			if err != io.EOF {
-				t.Errorf("unexpected readFrame error: %v", err)
-			}
-			break
-		}
-	}
-}
-
-func TestServerInitialFlowControlWindow(t *testing.T) {
-	for _, want := range []int32{
-		65535,
-		1 << 19,
-		1 << 21,
-		// For MaxUploadBufferPerConnection values in the range
-		// (65535, 65535*2), we don't send an initial WINDOW_UPDATE
-		// because we only send flow control when the window drops
-		// below half of the maximum. Perhaps it would be nice to
-		// test this case, but we currently do not.
-		65535 * 2,
-	} {
-		t.Run(fmt.Sprint(want), func(t *testing.T) {
-
-			st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
-			}, func(s *Server) {
-				s.MaxUploadBufferPerConnection = want
-			})
-			defer st.Close()
-			st.writePreface()
-			st.writeInitialSettings()
-			st.writeSettingsAck()
-			st.writeHeaders(HeadersFrameParam{
-				StreamID:      1,
-				BlockFragment: st.encodeHeader(),
-				EndStream:     true,
-				EndHeaders:    true,
-			})
-			window := 65535
-		Frames:
-			for {
-				f, err := st.readFrame()
-				if err != nil {
-					st.t.Fatal(err)
-				}
-				switch f := f.(type) {
-				case *WindowUpdateFrame:
-					if f.FrameHeader.StreamID != 0 {
-						t.Errorf("WindowUpdate StreamID = %d; want 0", f.FrameHeader.StreamID)
-						return
-					}
-					window += int(f.Increment)
-				case *HeadersFrame:
-					break Frames
-				default:
-				}
-			}
-			if window != int(want) {
-				t.Errorf("got initial flow control window = %v, want %v", window, want)
-			}
-		})
-	}
-}
-
-// TestCanonicalHeaderCacheGrowth verifies that the canonical header cache
-// size is capped to a reasonable level.
-func TestCanonicalHeaderCacheGrowth(t *testing.T) {
-	for _, size := range []int{1, (1 << 20) - 10} {
-		base := strings.Repeat("X", size)
-		sc := &serverConn{
-			serveG: newGoroutineLock(),
-		}
-		const count = 1000
-		for i := 0; i < count; i++ {
-			h := fmt.Sprintf("%v-%v", base, i)
-			c := sc.canonicalHeader(h)
-			if len(h) != len(c) {
-				t.Errorf("sc.canonicalHeader(%q) = %q, want same length", h, c)
-			}
-		}
-		total := 0
-		for k, v := range sc.canonHeader {
-			total += len(k) + len(v) + 100
-		}
-		if total > maxCachedCanonicalHeadersKeysSize {
-			t.Errorf("after adding %v ~%v-byte headers, canonHeader cache is ~%v bytes, want <%v", count, size, total, maxCachedCanonicalHeadersKeysSize)
-		}
-	}
-}
-
-// TestServerWriteDoesNotRetainBufferAfterStreamClose checks for access to
-// the slice passed to ResponseWriter.Write after Write returns.
-//
-// Terminating the request stream on the client causes Write to return.
-// We should not access the slice after this point.
-func TestServerWriteDoesNotRetainBufferAfterReturn(t *testing.T) {
-	donec := make(chan struct{})
-	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
-		defer close(donec)
-		buf := make([]byte, 1<<20)
-		var i byte
-		for {
-			i++
-			_, err := w.Write(buf)
-			for j := range buf {
-				buf[j] = byte(i) // trigger race detector
-			}
-			if err != nil {
-				return
-			}
-		}
-	}, optOnlyServer)
-	defer st.Close()
-
-	tr := &Transport{TLSClientConfig: tlsConfigInsecure}
-	defer tr.CloseIdleConnections()
-
-	req, _ := http.NewRequest("GET", st.ts.URL, nil)
-	res, err := tr.RoundTrip(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	res.Body.Close()
-	<-donec
-}
-
-// TestServerWriteDoesNotRetainBufferAfterServerClose checks for access to
-// the slice passed to ResponseWriter.Write after Write returns.
-//
-// Shutting down the Server causes Write to return.
-// We should not access the slice after this point.
-func TestServerWriteDoesNotRetainBufferAfterServerClose(t *testing.T) {
-	donec := make(chan struct{}, 1)
-	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
-		donec <- struct{}{}
-		defer close(donec)
-		buf := make([]byte, 1<<20)
-		var i byte
-		for {
-			i++
-			_, err := w.Write(buf)
-			for j := range buf {
-				buf[j] = byte(i)
-			}
-			if err != nil {
-				return
-			}
-		}
-	}, optOnlyServer)
-	defer st.Close()
-
-	tr := &Transport{TLSClientConfig: tlsConfigInsecure}
-	defer tr.CloseIdleConnections()
-
-	req, _ := http.NewRequest("GET", st.ts.URL, nil)
-	res, err := tr.RoundTrip(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	<-donec
-	st.ts.Config.Close()
-	<-donec
 }

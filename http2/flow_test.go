@@ -6,61 +6,9 @@ package http2
 
 import "testing"
 
-func TestInFlowTake(t *testing.T) {
-	var f inflow
-	f.init(100)
-	if !f.take(40) {
-		t.Fatalf("f.take(40) from 100: got false, want true")
-	}
-	if !f.take(40) {
-		t.Fatalf("f.take(40) from 60: got false, want true")
-	}
-	if f.take(40) {
-		t.Fatalf("f.take(40) from 20: got true, want false")
-	}
-	if !f.take(20) {
-		t.Fatalf("f.take(20) from 20: got false, want true")
-	}
-}
-
-func TestInflowAddSmall(t *testing.T) {
-	var f inflow
-	f.init(0)
-	// Adding even a small amount when there is no flow causes an immediate send.
-	if got, want := f.add(1), int32(1); got != want {
-		t.Fatalf("f.add(1) to 1 = %v, want %v", got, want)
-	}
-}
-
-func TestInflowAdd(t *testing.T) {
-	var f inflow
-	f.init(10 * inflowMinRefresh)
-	if got, want := f.add(inflowMinRefresh-1), int32(0); got != want {
-		t.Fatalf("f.add(minRefresh - 1) = %v, want %v", got, want)
-	}
-	if got, want := f.add(1), int32(inflowMinRefresh); got != want {
-		t.Fatalf("f.add(minRefresh) = %v, want %v", got, want)
-	}
-}
-
-func TestTakeInflows(t *testing.T) {
-	var a, b inflow
-	a.init(10)
-	b.init(20)
-	if !takeInflows(&a, &b, 5) {
-		t.Fatalf("takeInflows(a, b, 5) from 10, 20: got false, want true")
-	}
-	if takeInflows(&a, &b, 6) {
-		t.Fatalf("takeInflows(a, b, 6) from 5, 15: got true, want false")
-	}
-	if !takeInflows(&a, &b, 5) {
-		t.Fatalf("takeInflows(a, b, 5) from 5, 15: got false, want true")
-	}
-}
-
-func TestOutFlow(t *testing.T) {
-	var st outflow
-	var conn outflow
+func TestFlow(t *testing.T) {
+	var st flow
+	var conn flow
 	st.add(3)
 	conn.add(2)
 
@@ -81,8 +29,8 @@ func TestOutFlow(t *testing.T) {
 	}
 }
 
-func TestOutFlowAdd(t *testing.T) {
-	var f outflow
+func TestFlowAdd(t *testing.T) {
+	var f flow
 	if !f.add(1) {
 		t.Fatal("failed to add 1")
 	}
@@ -103,8 +51,8 @@ func TestOutFlowAdd(t *testing.T) {
 	}
 }
 
-func TestOutFlowAddOverflow(t *testing.T) {
-	var f outflow
+func TestFlowAddOverflow(t *testing.T) {
+	var f flow
 	if !f.add(0) {
 		t.Fatal("failed to add 0")
 	}
