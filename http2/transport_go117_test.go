@@ -11,10 +11,13 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"net/http"
-	"net/http/httptest"
+	//"net/http"
+	//"net/http/httptest"
 
 	"testing"
+	
+	"github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptest"
 )
 
 func TestTransportDialTLSContext(t *testing.T) {

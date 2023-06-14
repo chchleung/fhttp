@@ -10,8 +10,10 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"net/http"
+	//"net/http"
 	"sync"
+
+	"github.com/chchleung/fhttp/http"
 )
 
 // ClientConnPool manages a pool of HTTP/2 client connections.

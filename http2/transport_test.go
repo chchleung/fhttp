@@ -20,9 +20,9 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"net/http"
-	"net/http/httptest"
-	"net/http/httptrace"
+	//"net/http"
+	//"net/http/httptest"
+	//"net/http/httptrace"
 	"net/textproto"
 	"net/url"
 	"os"
@@ -36,7 +36,12 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/http2/hpack"
+	//"golang.org/x/net/http2/hpack"
+
+	"github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptest"
+	"github.com/chchleung/fhttp/http/httptrace"
+	"github.com/chchleung/fhttp/http2/hpack"
 )
 
 var (

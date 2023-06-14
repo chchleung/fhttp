@@ -17,13 +17,16 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/http"
+	//"net/http"
 	"net/textproto"
 	"os"
 	"strings"
 
 	"golang.org/x/net/http/httpguts"
-	"golang.org/x/net/http2"
+	//"golang.org/x/net/http2"
+
+	"github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http2"
 )
 
 var (

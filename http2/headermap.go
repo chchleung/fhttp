@@ -5,8 +5,10 @@
 package http2
 
 import (
-	"net/http"
+	//"net/http"
 	"sync"
+
+	"github.com/chchleung/fhttp/http"
 )
 
 var (

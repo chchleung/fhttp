@@ -12,12 +12,16 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"net/http"
-	"net/http/httptest"
+	//"net/http"
+	//"net/http/httptest"
 	"strings"
 	"testing"
 
-	"golang.org/x/net/http2"
+	//"golang.org/x/net/http2"
+	
+	"github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptest"
+	"github.com/chchleung/fhttp/http2"
 )
 
 func ExampleNewHandler() {

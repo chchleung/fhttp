@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
+	//"net/http"
 	"reflect"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/chchleung/fhttp/http"
 )
 
 func TestServer_Push_Success(t *testing.T) {

@@ -17,8 +17,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"net/http"
-	"net/http/httptest"
+	//"net/http"
+	//"net/http/httptest"
 	"os"
 	"os/exec"
 	"reflect"
@@ -30,7 +30,11 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/http2/hpack"
+	//"golang.org/x/net/http2/hpack"
+	
+	"github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptest"
+	"github.com/chchleung/fhttp/http2/hpack"
 )
 
 var stderrVerbose = flag.Bool("stderr_verbose", false, "Mirror verbosity to stderr, unbuffered")

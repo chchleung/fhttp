@@ -21,8 +21,8 @@ import (
 	"math"
 	mathrand "math/rand"
 	"net"
-	"net/http"
-	"net/http/httptrace"
+	//"net/http"
+	//"net/http/httptrace"
 	"net/textproto"
 	"os"
 	"sort"
@@ -33,8 +33,12 @@ import (
 	"time"
 
 	"golang.org/x/net/http/httpguts"
-	"golang.org/x/net/http2/hpack"
+	//"golang.org/x/net/http2/hpack"
 	"golang.org/x/net/idna"
+
+	"github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http/httptrace"
+	"github.com/chchleung/fhttp/http2/hpack"
 )
 
 const (

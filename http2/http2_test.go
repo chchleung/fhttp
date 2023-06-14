@@ -10,7 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/http"
+	//"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,7 +20,10 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/http2/hpack"
+	//"golang.org/x/net/http2/hpack"
+	
+	"github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http2/hpack"
 )
 
 var knownFailing = flag.Bool("known_failing", false, "Run known-failing tests.")

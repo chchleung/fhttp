@@ -8,11 +8,14 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"net/http"
+	//"net/http"
 	"net/url"
 
 	"golang.org/x/net/http/httpguts"
-	"golang.org/x/net/http2/hpack"
+	//"golang.org/x/net/http2/hpack"
+
+	"github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http2/hpack"
 )
 
 // writeFramer is implemented by any type that is used to write frames.
