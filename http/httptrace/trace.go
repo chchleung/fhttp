@@ -15,7 +15,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/chchleung/fhttp/http/internal/nettrace"
+	"github.com/chchleung/fhttp/internal/nettrace"
 )
 
 // unique type to prevent assignment.

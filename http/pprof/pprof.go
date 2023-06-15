@@ -82,7 +82,7 @@ import (
 	"time"
 
 	http "github.com/chchleung/fhttp/http"
-	"github.com/chchleung/fhttp/http/internal/profile"
+	"github.com/chchleung/fhttp/internal/profile"
 )
 
 func init() {

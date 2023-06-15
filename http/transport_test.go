@@ -50,8 +50,8 @@ import (
 	"github.com/chchleung/fhttp/http/httptest"
 	"github.com/chchleung/fhttp/http/httptrace"
 	"github.com/chchleung/fhttp/http/httputil"
-	"github.com/chchleung/fhttp/http/internal/nettrace"
 	"github.com/chchleung/fhttp/http/internal/testcert"
+	"github.com/chchleung/fhttp/internal/nettrace"
 )
 
 // TODO: test 5 pipelined requests with responses: 1) OK, 2) OK, Connection: Close

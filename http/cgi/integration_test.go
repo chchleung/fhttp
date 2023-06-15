@@ -24,7 +24,7 @@ import (
 
 	http "github.com/chchleung/fhttp/http"
 	"github.com/chchleung/fhttp/http/httptest"
-	"github.com/chchleung/fhttp/http/internal/testenv"
+	"github.com/chchleung/fhttp/internal/testenv"
 )
 
 // This test is a CGI host (testing host.go) that runs its own binary

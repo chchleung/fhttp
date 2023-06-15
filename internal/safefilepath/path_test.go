@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/chchleung/fhttp/http/internal/safefilepath"
+	"github.com/chchleung/fhttp/internal/safefilepath"
 )
 
 type PathTest struct {

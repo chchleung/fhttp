@@ -16,7 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"internal/testenv"
+	//"internal/testenv"
 	"io"
 	"log"
 	"math/rand"
@@ -43,13 +43,14 @@ import (
 	"syscall"
 	"testing"
 	"time"
-	
+
 	. "github.com/chchleung/fhttp/http"
 	"github.com/chchleung/fhttp/http/httptest"
 	"github.com/chchleung/fhttp/http/httptrace"
 	"github.com/chchleung/fhttp/http/httputil"
 	"github.com/chchleung/fhttp/http/internal"
 	"github.com/chchleung/fhttp/http/internal/testcert"
+	"github.com/chchleung/fhttp/internal/testenv"
 )
 
 type dummyAddr string

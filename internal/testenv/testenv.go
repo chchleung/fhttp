@@ -14,9 +14,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"internal/cfg"
-	"internal/goroot"
-	"internal/platform"
+	//"internal/cfg"
+	//"internal/goroot"
+	//"internal/platform"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +25,10 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/chchleung/fhttp/internal/cfg"
+	"github.com/chchleung/fhttp/internal/goroot"
+	"github.com/chchleung/fhttp/internal/platform"
 )
 
 // Builder reports the name of the builder running this test

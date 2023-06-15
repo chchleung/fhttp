@@ -5,11 +5,13 @@
 package testenv_test
 
 import (
-	"internal/testenv"
+	//"internal/testenv"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/chchleung/fhttp/internal/testenv"
 )
 
 func TestGoToolLocation(t *testing.T) {

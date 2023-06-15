@@ -33,7 +33,7 @@ import (
 	. "github.com/chchleung/fhttp/http"
 	"github.com/chchleung/fhttp/http/cookiejar"
 	"github.com/chchleung/fhttp/http/httptest"
-	"github.com/chchleung/fhttp/http/internal/testenv"
+	"github.com/chchleung/fhttp/internal/testenv"
 )
 
 var robotsTxtHandler = HandlerFunc(func(w ResponseWriter, r *Request) {

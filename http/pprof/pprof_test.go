@@ -22,8 +22,8 @@ import (
 
 	http "github.com/chchleung/fhttp/http"
 	"github.com/chchleung/fhttp/http/httptest"
-	"github.com/chchleung/fhttp/http/internal/profile"
-	"github.com/chchleung/fhttp/http/internal/testenv"
+	"github.com/chchleung/fhttp/internal/profile"
+	"github.com/chchleung/fhttp/internal/testenv"
 )
 
 // TestDescriptions checks that the profile names under runtime/pprof package

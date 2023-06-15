@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chchleung/fhttp/http/internal/safefilepath"
+	"github.com/chchleung/fhttp/internal/safefilepath"
 )
 
 // A Dir implements FileSystem using the native file system restricted to a

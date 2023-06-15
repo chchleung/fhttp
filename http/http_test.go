@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chchleung/fhttp/http/internal/testenv"
+	"github.com/chchleung/fhttp/internal/testenv"
 )
 
 func TestForeachHeaderElement(t *testing.T) {
