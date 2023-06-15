@@ -197,6 +197,8 @@ type Transport struct {
 	Settings          []Setting
 	InitialWindowSize uint32 // if nil, will use global initialWindowSize
 	HeaderTableSize   uint32 // if nil, will use global initialHeaderTableSize
+
+	PHeaderOrder []string
 }
 
 func (t *Transport) maxHeaderListSize() uint32 {
@@ -1998,16 +2000,43 @@ func (cc *ClientConn) encodeHeaders(req *http.Request, addGzipHeader bool, trail
 		// target URI (the path-absolute production and optionally a '?' character
 		// followed by the query production, see Sections 3.3 and 3.4 of
 		// [RFC3986]).
-		f(":authority", host)
-		m := req.Method
-		if m == "" {
-			m = http.MethodGet
+
+		// customs set h2 pseudo header
+		// ====== customs set start ======
+		if cc.t.PHeaderOrder != nil && ValidPseudoHeader(cc.t.PHeaderOrder) {
+			for _, p := range cc.t.PHeaderOrder {
+				switch p {
+				case PseudoAuthority:
+					f(":authority", host)
+				case PseudoMethod:
+					f(":method", req.Method)
+				case PseudoPath:
+					if req.Method != "CONNECT" {
+						f(":path", path)
+					}
+				case PseudoScheme:
+					if req.Method != "CONNECT" {
+						f(":scheme", req.URL.Scheme)
+					}
+				default:
+					continue
+				}
+			}
+		} else {
+			f(":authority", host)
+			m := req.Method
+			if m == "" {
+				m = http.MethodGet
+			}
+			f(":method", m)
+			if req.Method != "CONNECT" {
+				f(":path", path)
+				f(":scheme", req.URL.Scheme)
+			}
 		}
-		f(":method", m)
-		if req.Method != "CONNECT" {
-			f(":path", path)
-			f(":scheme", req.URL.Scheme)
-		}
+
+		// ====== customs set end ======
+
 		if trailers != "" {
 			f("trailer", trailers)
 		}
@@ -3265,4 +3294,32 @@ func traceFirstResponseByte(trace *httptrace.ClientTrace) {
 	if trace != nil && trace.GotFirstResponseByte != nil {
 		trace.GotFirstResponseByte()
 	}
+}
+
+const (
+	PseudoMethod    = ":method"
+	PseudoPath      = ":path"
+	PseudoAuthority = ":authority"
+	PseudoScheme    = ":scheme"
+)
+
+var validPseudoHeader = map[string]string{
+	PseudoMethod:    ":method",
+	PseudoPath:      ":path",
+	PseudoAuthority: ":authority",
+	PseudoScheme:    ":scheme",
+}
+
+func ValidPseudoHeader(ph []string) bool {
+	if len(ph) > 4 {
+		return false
+	}
+	for _, h := range ph {
+		if _, ok := validPseudoHeader[h]; ok {
+			continue
+		} else {
+			return false
+		}
+	}
+	return true
 }
