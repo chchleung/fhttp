@@ -2930,3 +2930,8 @@ func (cl *connLRU) remove(pc *persistConn) {
 func (cl *connLRU) len() int {
 	return len(cl.m)
 }
+
+// SetH2transport allow custom to set h2 transport manually
+func (t *Transport) SetH2transport(h2t h2Transport) {
+	t.h2transport = h2t
+}
