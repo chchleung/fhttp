@@ -3311,7 +3311,7 @@ var validPseudoHeader = map[string]string{
 }
 
 func ValidPseudoHeader(ph []string) bool {
-	if len(ph) > 4 {
+	if len(ph) != 4 {
 		return false
 	}
 	for _, h := range ph {
