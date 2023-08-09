@@ -53,8 +53,7 @@ import (
 	"golang.org/x/net/idna"
 	
 	"github.com/chchleung/fhttp/http/httptrace"
-	"github.com/chchleung/fhttp/http2/hpack"	
-	
+	"github.com/chchleung/fhttp/http2/hpack"
 )
 
 // The HTTP protocols are defined in terms of ASCII, not Unicode. This file
