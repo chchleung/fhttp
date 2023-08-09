@@ -351,7 +351,7 @@ func expiresIn(delta int) string {
 	return "expires=" + t.Format(time.RFC1123)
 }
 
-// mustParseURL parses s to an URL and panics on error.
+// mustParseURL parses s to a URL and panics on error.
 func mustParseURL(s string) *url.URL {
 	u, err := url.Parse(s)
 	if err != nil || u.Scheme == "" || u.Host == "" {
@@ -672,7 +672,7 @@ var updateAndDeleteTests = [...]jarTest{
 		},
 	},
 	{
-		"Clear Secure flag from a http.",
+		"Clear Secure flag from an http.",
 		"http://www.host.test/",
 		[]string{
 			"b=xx",

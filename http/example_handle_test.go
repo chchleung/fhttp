@@ -10,7 +10,7 @@ import (
 	//"net/http"
 	"sync"
 
-	http "github.com/chchleung/fhttp/http"
+	"github.com/chchleung/fhttp/http"
 )
 
 type countHandler struct {
