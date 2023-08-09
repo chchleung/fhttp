@@ -15,13 +15,14 @@ using http2 package from golang.org/x/net v0.11.0
 
 ### modified:
 ##### godebug:
--- ignore init()
+-- ignore init()  @ from v1.0.2
+-- ignore registerMetric  @ from v1.1.0
 
 ##### http:
-transport.go
+transport.go   @ from v1.0.2
 
 ##### http2
-transport.go
+transport.go   @ from v1.0.2
 
 ---
 
