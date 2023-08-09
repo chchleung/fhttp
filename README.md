@@ -1,14 +1,20 @@
 # fhttp
 golang http package
 
-update @ v1.1.0
+### update 
+
+@ v1.1.0
+
 using http & internal package from Go sdk 1.21.0
+
 using http2 package from golang.org/x/net v0.11.0
 
 ----
 
 @ v1.0.2
+
 using http & internal package from Go sdk 1.20.3
+
 using http2 package from golang.org/x/net v0.11.0
 
 ---
@@ -16,6 +22,7 @@ using http2 package from golang.org/x/net v0.11.0
 ### modified:
 ##### godebug:
 -- ignore init()  @ from v1.0.2
+
 -- ignore registerMetric  @ from v1.1.0
 
 ##### http:
